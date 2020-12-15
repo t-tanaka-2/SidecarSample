@@ -2,10 +2,9 @@
 echo "##### start put-metric-ecs.sh #####"
 
 function put_metics_data() {
-  aws cloudwatch put-metric-data --dimensions $1 --timestamp $TIMESTAMP --namespace ECS --metric-name ContainerCPUUtilization --value $CPU_USAGE_RATIO --unit Percent
-  aws cloudwatch put-metric-data --dimensions $1 --timestamp $TIMESTAMP --namespace ECS --metric-name ContainerMemoryUsageUsed --value $MEMORY_USAGE --unit Bytes
-  aws cloudwatch put-metric-data --dimensions $1 --timestamp $TIMESTAMP --namespace ECS --metric-name ContainerMemoryUsageMax --value $MEMORY_LIMIT --unit Bytes
-  aws cloudwatch put-metric-data --dimensions $1 --timestamp $TIMESTAMP --namespace ECS --metric-name ContainerMemoryUtilization --value $MEMORY_USAGE_RATIO --unit Percent
+    for METRIC_NAME in "${!METRIC_RES_LIST[@]}"; do
+        aws cloudwatch put-metric-data --dimensions $1 --timestamp $TIMESTAMP --namespace ECS --metric-name "${METRIC_NAME}" --value "${METRIC_RES_LIST[${METRIC_NAME}]}" --unit "${UNIT_TYPE_LIST[${METRIC_NAME}]}"
+    done
 }
 
 # ECSメタデータエンドポイントのURLを変数にセットする
@@ -34,12 +33,26 @@ TOTAL_CPU_USAGE=`echo $TASK_STATS_JSON | jq ".$APP_CONTAINER_ID | .cpu_stats.cpu
 PRE_SYSTEM_CPU_USAGE=`echo $TASK_STATS_JSON | jq ".$APP_CONTAINER_ID | .precpu_stats.system_cpu_usage"`
 PRE_TOTAL_CPU_USAGE=`echo $TASK_STATS_JSON | jq ".$APP_CONTAINER_ID | .precpu_stats.cpu_usage.total_usage"`
 ONLINE_CPUS=`echo $TASK_STATS_JSON | jq ".$APP_CONTAINER_ID | .cpu_stats.online_cpus"`
-CPU_USAGE_RATIO=`python -c "print(($TOTAL_CPU_USAGE-$PRE_TOTAL_CPU_USAGE)*1.0/($SYSTEM_CPU_USAGE-$PRE_SYSTEM_CPU_USAGE)*$ONLINE_CPUS*100)"`
   
 # アプリコンテナのメモリメトリクスを取得
 MEMORY_LIMIT=`echo $TASK_STATS_JSON | jq ".$APP_CONTAINER_ID | .memory_stats.limit"`
 MEMORY_USAGE=`echo $TASK_STATS_JSON | jq ".$APP_CONTAINER_ID | .memory_stats.usage"`
-MEMORY_USAGE_RATIO=`python -c "print($MEMORY_USAGE*1.0/$MEMORY_LIMIT*100)"`
+
+# 計算結果をメトリクス名をキーにした連想配列に詰める
+declare -A METRIC_RES_LIST=(
+  ["ContainerCPUUtilization"]=`python -c "print(($TOTAL_CPU_USAGE-$PRE_TOTAL_CPU_USAGE)*1.0/($SYSTEM_CPU_USAGE-$PRE_SYSTEM_CPU_USAGE)*$ONLINE_CPUS*100)"`
+  ["ContainerMemoryUsageUsed"]=$MEMORY_USAGE
+  ["ContainerMemoryUsageMax"]=$MEMORY_LIMIT
+  ["ContainerMemoryUtilization"]=`python -c "print($MEMORY_USAGE*1.0/$MEMORY_LIMIT*100)"`
+)
+
+# メトリクス名をキーをメトリクスの単位を連想配列に詰める
+declare -A UNIT_TYPE_LIST=(
+  ["ContainerCPUUtilization"]=Percent
+  ["ContainerMemoryUsageUsed"]=Bytes
+  ["ContainerMemoryUsageMax"]=Bytes
+  ["ContainerMemoryUtilization"]=Percent
+)
 
 DIMENSIONS_TASK=ServiceName=$SERVICE_NAME,TaskName=$TASK_NAME
 DIMENSIONS_SEARVICE=ServiceName=$SERVICE_NAME
