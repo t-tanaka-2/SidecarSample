@@ -1,0 +1,19 @@
+# アクセスログの出力設定と出力先指定
+server:
+  tomcat:
+    accesslog:
+      enabled: true
+    basedir: ./
+# アプリケーションログの出力設定と出力先指定
+logging:
+  file:
+    path: ./logs
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/postgres
+    driver-class-name: org.postgresql.Driver
+    username: postgres
+    password: mysecretpassword
+    hikari:
+      maximumPoolSize: 20
+      register-mbeans: true

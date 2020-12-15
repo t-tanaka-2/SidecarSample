@@ -1,0 +1,16 @@
+version: '3.8'
+services:
+  # 前提：事前に専用のボリュームを作成するため下記コマンドを流すこと(初回のみ)
+  # docker volume create --name sidecar-postgres-volume -d local
+  postgressql:
+    image: postgres:11
+    container_name: sidecar-postgres
+    environment:
+      POSTGRES_PASSWORD: mysecretpassword
+    ports:
+      - "5432:5432"
+    volumes:
+      - sidecar-postgres-volume:/var/lib/postgresql/data
+volumes:
+  sidecar-postgres-volume:
+    external: true
